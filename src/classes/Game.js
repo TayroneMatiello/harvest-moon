@@ -93,30 +93,7 @@ export default class Game extends Phaser.Scene {
     // handles modal box for tasks and status
     this._UTILITY.boxManager = new BoxManager( this );
 
-
-this.animals = ['cow', 'chicken', 'bird']
-this.correctSequence = []
-this.playerSequence = []
-
-for (let i = 0; i < 3; i++) {
-  const animal = Phaser.Utils.Array.GetRandom(this.animals)
-  this.correctSequence.push(animal)
-}
-this.add.text(
-  this.scale.width / 2,
-  50,
-  'Ouça os sons e encontre os animais na ordem correta!',
-  {
-    font: '24px monospace',
-    fill: '#ffffff',
-    backgroundColor: '#000000'
-  }
-)
-.setOrigin(0.5)
-.setScrollFactor(0)
-.setDepth(1000);
-  
-this.playSequence();
+    this.setupMemoryGame();
 
 }
 
@@ -148,21 +125,205 @@ this.playSequence();
 
 
   }
-playSequence(index = 0) {
+  setupMemoryGame() {
+    this.animals = ['cow', 'chicken', 'bird'];
+    this.correctSequence = [];
+    this.playerSequence = [];
+    this.memoryGameStarted = false;
+    this.sequenceIsPlaying = false;
+    this.roundCompleted = false;
+    this.activeDialog = null;
 
-  if (index >= this.correctSequence.length) {
-    return
+    for ( let i = 0; i < 3; i++ ) {
+      const animal = Phaser.Utils.Array.GetRandom( this.animals );
+      this.correctSequence.push( animal );
+    }
+
+    this.setupAnimalClickHandlers();
+    this.showMemoryDialog();
+    this.playSequence();
   }
 
-  const animal = this.correctSequence[index]
+  setupAnimalClickHandlers() {
+    Object.values( this._SPRITES ).forEach( sprite => {
+      if ( sprite.creatureType !== 'animal' ) {
+        return;
+      }
 
-  this.sound.play(animal)
+      sprite.setInteractive( { useHandCursor: true } );
+      sprite.on( 'pointerdown', () => {
+        this.handleAnimalClick( sprite );
+      } );
+    } );
+  }
 
-  this.time.delayedCall(3000, () => {
-    this.playSequence(index + 1)
-  })
+  getAnimalTypeFromSprite( sprite ) {
+    if ( sprite.name.includes( 'cow' ) ) {
+      return 'cow';
+    }
 
-}
+    if ( sprite.name.includes( 'chicken' ) || sprite.name.includes( 'chick' ) ) {
+      return 'chicken';
+    }
+
+    if ( sprite.name.includes( 'bird' ) ) {
+      return 'bird';
+    }
+
+    return null;
+  }
+
+  handleAnimalClick( sprite ) {
+    if ( !this.memoryGameStarted || this.sequenceIsPlaying || this.roundCompleted ) {
+      return;
+    }
+
+    const clickedAnimal = this.getAnimalTypeFromSprite( sprite );
+    if ( !clickedAnimal ) {
+      return;
+    }
+
+    this.playerSequence.push( clickedAnimal );
+
+    const currentIndex = this.playerSequence.length - 1;
+    const expectedAnimal = this.correctSequence[currentIndex];
+
+    if ( clickedAnimal !== expectedAnimal ) {
+      this.playerSequence = [];
+      this.showMemoryStatus( 'Ops! Essa não é a ordem correta. Ouça novamente e tente outra vez.' );
+      this.playSequence();
+      return;
+    }
+
+    sprite.disableInteractive();
+    sprite.setVisible( false );
+    if ( sprite.body ) {
+      sprite.body.enable = false;
+    }
+    if ( sprite.overlap && sprite.overlap.body ) {
+      sprite.overlap.body.enable = false;
+      sprite.overlap.setVisible( false );
+    }
+
+    if ( this.playerSequence.length === this.correctSequence.length ) {
+      this.roundCompleted = true;
+      this.showMemoryStatus( 'Parabéns! Você acertou a sequência dos animais!' );
+      return;
+    }
+
+    this.showMemoryStatus( 'Muito bem! Agora encontre o próximo animal da sequência.' );
+  }
+
+  playSequence( index = 0 ) {
+    if ( index === 0 ) {
+      this.sequenceIsPlaying = true;
+      this.memoryGameStarted = false;
+    }
+
+    if ( index >= this.correctSequence.length ) {
+      this.sequenceIsPlaying = false;
+      this.showStartButton();
+      return;
+    }
+
+    const animal = this.correctSequence[index];
+    this.sound.play( animal );
+
+    this.time.delayedCall( 1500, () => {
+      this.playSequence( index + 1 );
+    } );
+  }
+
+  showMemoryDialog() {
+    const dialogWidth = 660;
+    const dialogHeight = 170;
+
+    const dialogBg = this.add.rectangle(
+      this.scale.width / 2,
+      100,
+      dialogWidth,
+      dialogHeight,
+      0x000000,
+      0.85
+    )
+      .setScrollFactor( 0 )
+      .setDepth( 1000 );
+
+    const dialogText = this.add.text(
+      this.scale.width / 2,
+      70,
+      'Ouça os sons e encontre os animais na ordem correta!',
+      {
+        font: '22px monospace',
+        fill: '#ffffff',
+        align: 'center',
+        wordWrap: { width: dialogWidth - 40 }
+      }
+    )
+      .setOrigin( 0.5 )
+      .setScrollFactor( 0 )
+      .setDepth( 1001 );
+
+    const statusText = this.add.text(
+      this.scale.width / 2,
+      105,
+      'Memorize a sequência de sons.',
+      {
+        font: '18px monospace',
+        fill: '#ffd166',
+        align: 'center'
+      }
+    )
+      .setOrigin( 0.5 )
+      .setScrollFactor( 0 )
+      .setDepth( 1001 );
+
+    this.activeDialog = {
+      dialogBg,
+      dialogText,
+      statusText,
+      startBtnBg: null,
+      startBtnText: null
+    };
+  }
+
+  showStartButton() {
+    if ( this.roundCompleted || !this.activeDialog || this.activeDialog.startBtnBg ) {
+      return;
+    }
+
+    const startBtnBg = this.add.rectangle( this.scale.width / 2, 145, 140, 40, 0x1d6f42 )
+      .setScrollFactor( 0 )
+      .setDepth( 1001 )
+      .setInteractive( { useHandCursor: true } );
+
+    const startBtnText = this.add.text( this.scale.width / 2, 145, 'Iniciar', {
+      font: '20px monospace',
+      fill: '#ffffff'
+    } )
+      .setOrigin( 0.5 )
+      .setScrollFactor( 0 )
+      .setDepth( 1002 );
+
+    startBtnBg.on( 'pointerdown', () => {
+      this.memoryGameStarted = true;
+      this.showMemoryStatus( 'Clique nos animais na ordem dos sons.' );
+      startBtnBg.destroy();
+      startBtnText.destroy();
+      this.activeDialog.startBtnBg = null;
+      this.activeDialog.startBtnText = null;
+    } );
+
+    this.activeDialog.startBtnBg = startBtnBg;
+    this.activeDialog.startBtnText = startBtnText;
+    this.showMemoryStatus( 'Agora clique em Iniciar para tentar.' );
+  }
+
+  showMemoryStatus( message ) {
+    if ( this.activeDialog && this.activeDialog.statusText ) {
+      this.activeDialog.statusText.setText( message );
+    }
+  }
 
   // plays animation of passed key
   playAnim( animKey ) {
