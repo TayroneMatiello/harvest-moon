@@ -124,6 +124,18 @@ export default class Game extends Phaser.Scene {
     }
 
 
+    if ( gameConfig.overlapData.isActive && gameConfig.overlapData.sprite?.creatureType === 'animal' ) {
+      const overlapAnimal = gameConfig.overlapData.sprite;
+
+      if ( this.activeOverlapAnimalName !== overlapAnimal.name ) {
+        this.activeOverlapAnimalName = overlapAnimal.name;
+        this.handleAnimalSelection( overlapAnimal );
+      }
+    } else {
+      this.activeOverlapAnimalName = null;
+    }
+
+
   }
   setupMemoryGame() {
     this.animals = ['cow', 'chicken', 'bird'];
@@ -134,6 +146,7 @@ export default class Game extends Phaser.Scene {
     this.sequenceIsPlaying = false;
     this.roundCompleted = false;
     this.activeDialog = null;
+    this.activeOverlapAnimalName = null;
 
     for ( let i = 0; i < 3; i++ ) {
       const animal = Phaser.Utils.Array.GetRandom( this.availableAnimals );
@@ -172,7 +185,7 @@ export default class Game extends Phaser.Scene {
 
       sprite.setInteractive( { useHandCursor: true } );
       sprite.on( 'pointerdown', () => {
-        this.handleAnimalClick( sprite );
+        this.handleAnimalSelection( sprite );
       } );
     } );
   }
@@ -193,7 +206,7 @@ export default class Game extends Phaser.Scene {
     return null;
   }
 
-  handleAnimalClick( sprite ) {
+  handleAnimalSelection( sprite ) {
     if ( !this.memoryGameStarted || this.sequenceIsPlaying || this.roundCompleted ) {
       return;
     }
@@ -339,6 +352,7 @@ export default class Game extends Phaser.Scene {
     } );
 
     this.activeDialog = null;
+    this.activeOverlapAnimalName = null;
   }
 
   showSimpleMessage( message, isSuccess ) {
