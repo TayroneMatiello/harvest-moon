@@ -147,6 +147,7 @@ export default class Game extends Phaser.Scene {
     this.roundCompleted = false;
     this.activeDialog = null;
     this.activeOverlapAnimalName = null;
+    this.hiddenAnimals = [];
 
     for ( let i = 0; i < 3; i++ ) {
       const animal = Phaser.Utils.Array.GetRandom( this.availableAnimals );
@@ -223,8 +224,9 @@ export default class Game extends Phaser.Scene {
       this.memoryGameStarted = false;
       this.playerSequence = [];
       this.restoreHiddenAnimals();
-      this.showSimpleMessage( 'Você errou', false );
+      this.showSimpleMessage( 'Você Errou!', false );
       this.time.delayedCall( 900, () => {
+        this.activeOverlapAnimalName = null;
         this.showMemoryDialog();
         this.playSequence();
       } );
@@ -253,6 +255,11 @@ export default class Game extends Phaser.Scene {
   }
 
   restoreHiddenAnimals() {
+    if ( !Array.isArray( this.hiddenAnimals ) ) {
+      this.hiddenAnimals = [];
+      return;
+    }
+
     this.hiddenAnimals.forEach( sprite => {
       sprite.setVisible( true );
       if ( sprite.body ) {
