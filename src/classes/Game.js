@@ -42,7 +42,7 @@ export default class Game extends Phaser.Scene {
 
  this.load.audio('cow', 'audio/cow.ogg');
   this.load.audio('chicken', 'audio/chicken.ogg');
-  this.load.audio('bird', 'audio/bird.ogg');
+  this.load.audio('dog', 'audio/dog.ogg');
 
   }
 
@@ -138,7 +138,7 @@ export default class Game extends Phaser.Scene {
 
   }
   setupMemoryGame() {
-    this.animals = ['cow', 'chicken', 'bird'];
+    this.animals = ['cow', 'chicken', 'dog'];
     this.availableAnimals = this.getAvailableAnimals();
     this.correctSequence = [];
     this.playerSequence = [];
@@ -175,7 +175,7 @@ export default class Game extends Phaser.Scene {
 
     const availableAnimals = this.animals.filter( animal => foundAnimals.has( animal ) );
 
-    return availableAnimals.length > 0 ? availableAnimals : ['cow', 'chicken'];
+    return availableAnimals.length > 0 ? availableAnimals : ['cow', 'chicken', 'dog'];
   }
 
   setupAnimalClickHandlers() {
@@ -200,8 +200,8 @@ export default class Game extends Phaser.Scene {
       return 'chicken';
     }
 
-    if ( sprite.name.includes( 'bird' ) || sprite.name.includes( 'dog' ) ) {
-      return 'bird';
+    if ( sprite.name.includes( 'dog' ) ) {
+      return 'dog';
     }
 
     return null;

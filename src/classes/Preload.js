@@ -23,7 +23,7 @@ export default class Preload extends Phaser.Scene {
     // sons dos animais
     this.load.audio('cow', 'audio/cow.ogg');
     this.load.audio('chicken', 'audio/chicken.ogg');
-    this.load.audio('bird', 'audio/bird.ogg');
+    this.load.audio('dog', 'audio/dog.ogg');
 }
 
     create() {
