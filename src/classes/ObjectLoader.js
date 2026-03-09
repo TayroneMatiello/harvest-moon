@@ -51,7 +51,9 @@ export default class ObjectLoader {
           }
           else if ( type === 'calf' ) {}
           else if ( type === 'chick' ) {}
-          else if ( type === 'dog' ) {}
+          else if ( type === 'dog' ) {
+            this.sprites[name] = new Sprite( { scene: this.scene, x: obj.x, y: obj.y, key: 'dog' }, name, 'animal' );
+          }
           else if ( type === 'horse' ) {}
         });
       }

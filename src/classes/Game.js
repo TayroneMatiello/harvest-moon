@@ -42,7 +42,7 @@ export default class Game extends Phaser.Scene {
 
  this.load.audio('cow', 'audio/cow.ogg');
   this.load.audio('chicken', 'audio/chicken.ogg');
-  this.load.audio('bird', 'audio/bird.ogg');
+  this.load.audio('dog', 'audio/dog.ogg');
 
   }
 
@@ -93,30 +93,7 @@ export default class Game extends Phaser.Scene {
     // handles modal box for tasks and status
     this._UTILITY.boxManager = new BoxManager( this );
 
-
-this.animals = ['cow', 'chicken', 'bird']
-this.correctSequence = []
-this.playerSequence = []
-
-for (let i = 0; i < 3; i++) {
-  const animal = Phaser.Utils.Array.GetRandom(this.animals)
-  this.correctSequence.push(animal)
-}
-this.add.text(
-  this.scale.width / 2,
-  50,
-  'Ouça os sons e encontre os animais na ordem correta!',
-  {
-    font: '24px monospace',
-    fill: '#ffffff',
-    backgroundColor: '#000000'
-  }
-)
-.setOrigin(0.5)
-.setScrollFactor(0)
-.setDepth(1000);
-  
-this.playSequence();
+    this.setupMemoryGame();
 
 }
 
@@ -147,22 +124,287 @@ this.playSequence();
     }
 
 
+    if ( gameConfig.overlapData.isActive && gameConfig.overlapData.sprite?.creatureType === 'animal' ) {
+      const overlapAnimal = gameConfig.overlapData.sprite;
+
+      if ( this.activeOverlapAnimalName !== overlapAnimal.name ) {
+        this.activeOverlapAnimalName = overlapAnimal.name;
+        this.handleAnimalSelection( overlapAnimal );
+      }
+    } else {
+      this.activeOverlapAnimalName = null;
+    }
+
+
   }
-playSequence(index = 0) {
+  setupMemoryGame() {
+    this.animals = ['cow', 'chicken', 'dog'];
+    this.availableAnimals = this.getAvailableAnimals();
+    this.correctSequence = [];
+    this.playerSequence = [];
+    this.memoryGameStarted = false;
+    this.sequenceIsPlaying = false;
+    this.roundCompleted = false;
+    this.activeDialog = null;
+    this.activeOverlapAnimalName = null;
+    this.hiddenAnimals = [];
 
-  if (index >= this.correctSequence.length) {
-    return
+    for ( let i = 0; i < 3; i++ ) {
+      const animal = Phaser.Utils.Array.GetRandom( this.availableAnimals );
+      this.correctSequence.push( animal );
+    }
+
+    this.setupAnimalClickHandlers();
+    this.showMemoryDialog();
+    this.playSequence();
   }
 
-  const animal = this.correctSequence[index]
+  getAvailableAnimals() {
+    const foundAnimals = new Set();
 
-  this.sound.play(animal)
+    Object.values( this._SPRITES ).forEach( sprite => {
+      if ( sprite.creatureType !== 'animal' ) {
+        return;
+      }
 
-  this.time.delayedCall(3000, () => {
-    this.playSequence(index + 1)
-  })
+      const animalType = this.getAnimalTypeFromSprite( sprite );
+      if ( animalType ) {
+        foundAnimals.add( animalType );
+      }
+    } );
 
-}
+    const availableAnimals = this.animals.filter( animal => foundAnimals.has( animal ) );
+
+    return availableAnimals.length > 0 ? availableAnimals : ['cow', 'chicken', 'dog'];
+  }
+
+  setupAnimalClickHandlers() {
+    Object.values( this._SPRITES ).forEach( sprite => {
+      if ( sprite.creatureType !== 'animal' ) {
+        return;
+      }
+
+      sprite.setInteractive( { useHandCursor: true } );
+      sprite.on( 'pointerdown', () => {
+        this.handleAnimalSelection( sprite );
+      } );
+    } );
+  }
+
+  getAnimalTypeFromSprite( sprite ) {
+    if ( sprite.name.includes( 'cow' ) ) {
+      return 'cow';
+    }
+
+    if ( sprite.name.includes( 'chicken' ) || sprite.name.includes( 'chick' ) ) {
+      return 'chicken';
+    }
+
+    if ( sprite.name.includes( 'dog' ) ) {
+      return 'dog';
+    }
+
+    return null;
+  }
+
+  handleAnimalSelection( sprite ) {
+    if ( !this.memoryGameStarted || this.sequenceIsPlaying || this.roundCompleted ) {
+      return;
+    }
+
+    const clickedAnimal = this.getAnimalTypeFromSprite( sprite );
+    if ( !clickedAnimal ) {
+      return;
+    }
+
+    const currentIndex = this.playerSequence.length;
+    const expectedAnimal = this.correctSequence[currentIndex];
+
+    if ( clickedAnimal !== expectedAnimal ) {
+      this.memoryGameStarted = false;
+      this.playerSequence = [];
+      this.restoreHiddenAnimals();
+      this.showSimpleMessage( 'Você Errou!', false );
+      this.time.delayedCall( 900, () => {
+        this.activeOverlapAnimalName = null;
+        this.showMemoryDialog();
+        this.playSequence();
+      } );
+      return;
+    }
+
+    this.playerSequence.push( clickedAnimal );
+    this.sound.play( clickedAnimal );
+
+    sprite.disableInteractive();
+    sprite.setVisible( false );
+    if ( sprite.body ) {
+      sprite.body.enable = false;
+    }
+    if ( sprite.overlap && sprite.overlap.body ) {
+      sprite.overlap.body.enable = false;
+      sprite.overlap.setVisible( false );
+    }
+
+    this.hiddenAnimals.push( sprite );
+
+    if ( this.playerSequence.length === this.correctSequence.length ) {
+      this.roundCompleted = true;
+      this.showSimpleMessage( 'Parabéns, você conseguiu!', true );
+    }
+  }
+
+  restoreHiddenAnimals() {
+    if ( !Array.isArray( this.hiddenAnimals ) ) {
+      this.hiddenAnimals = [];
+      return;
+    }
+
+    this.hiddenAnimals.forEach( sprite => {
+      sprite.setVisible( true );
+      if ( sprite.body ) {
+        sprite.body.enable = true;
+      }
+      if ( sprite.overlap && sprite.overlap.body ) {
+        sprite.overlap.body.enable = true;
+        sprite.overlap.setVisible( true );
+      }
+      sprite.setInteractive( { useHandCursor: true } );
+    } );
+
+    this.hiddenAnimals = [];
+  }
+
+
+  playSequence( index = 0 ) {
+    if ( index === 0 ) {
+      this.sequenceIsPlaying = true;
+      this.memoryGameStarted = false;
+      this.playerSequence = [];
+    }
+
+    if ( index >= this.correctSequence.length ) {
+      this.sequenceIsPlaying = false;
+      this.showStartButton();
+      return;
+    }
+
+    const animal = this.correctSequence[index];
+    this.sound.play( animal );
+
+    this.time.delayedCall( 1400, () => {
+      this.playSequence( index + 1 );
+    } );
+  }
+
+  showMemoryDialog() {
+    this.destroyMemoryDialog();
+
+    const dialogWidth = 660;
+    const dialogHeight = 170;
+
+    const dialogBg = this.add.rectangle(
+      this.scale.width / 2,
+      this.scale.height / 2,
+      dialogWidth,
+      dialogHeight,
+      0x000000,
+      0.85
+    )
+      .setScrollFactor( 0 )
+      .setDepth( 1000 );
+
+    const dialogText = this.add.text(
+      this.scale.width / 2,
+      this.scale.height / 2 - 20,
+      'Ouça os sons e encontre os animais na ordem correta!',
+      {
+        font: '22px monospace',
+        fill: '#ffffff',
+        align: 'center',
+        wordWrap: { width: dialogWidth - 40 }
+      }
+    )
+      .setOrigin( 0.5 )
+      .setScrollFactor( 0 )
+      .setDepth( 1001 );
+
+    const startBtnBg = this.add.rectangle( this.scale.width / 2, this.scale.height / 2 + 35, 140, 40, 0x1d6f42 )
+      .setScrollFactor( 0 )
+      .setDepth( 1001 )
+      .setInteractive( { useHandCursor: true } )
+      .setAlpha( 0.45 );
+
+    const startBtnText = this.add.text( this.scale.width / 2, this.scale.height / 2 + 35, 'Iniciar', {
+      font: '20px monospace',
+      fill: '#ffffff'
+    } )
+      .setOrigin( 0.5 )
+      .setScrollFactor( 0 )
+      .setDepth( 1002 )
+      .setAlpha( 0.45 );
+
+    this.activeDialog = {
+      dialogBg,
+      dialogText,
+      startBtnBg,
+      startBtnText
+    };
+  }
+
+  showStartButton() {
+    if ( this.roundCompleted || !this.activeDialog || !this.activeDialog.startBtnBg ) {
+      return;
+    }
+
+    this.activeDialog.startBtnBg.setAlpha( 1 );
+    this.activeDialog.startBtnText.setAlpha( 1 );
+
+    this.activeDialog.startBtnBg.removeAllListeners( 'pointerdown' );
+    this.activeDialog.startBtnBg.on( 'pointerdown', () => {
+      this.memoryGameStarted = true;
+      this.destroyMemoryDialog();
+    } );
+  }
+
+  destroyMemoryDialog() {
+    if ( !this.activeDialog ) {
+      return;
+    }
+
+    Object.values( this.activeDialog ).forEach( elm => {
+      if ( elm && elm.destroy ) {
+        elm.destroy();
+      }
+    } );
+
+    this.activeDialog = null;
+    this.activeOverlapAnimalName = null;
+  }
+
+  showSimpleMessage( message, isSuccess ) {
+    const width = 420;
+    const bg = this.add.rectangle( this.scale.width / 2, 80, width, 70, 0x000000, 0.9 )
+      .setScrollFactor( 0 )
+      .setDepth( 1100 );
+
+    const text = this.add.text( this.scale.width / 2, 80, message, {
+      font: '24px monospace',
+      fill: isSuccess ? '#7CFC00' : '#ff6666',
+      align: 'center',
+      wordWrap: { width: width - 30 }
+    } )
+      .setOrigin( 0.5 )
+      .setScrollFactor( 0 )
+      .setDepth( 1101 );
+
+    if ( !isSuccess ) {
+      this.time.delayedCall( 900, () => {
+        bg.destroy();
+        text.destroy();
+      } );
+    }
+  }
 
   // plays animation of passed key
   playAnim( animKey ) {
