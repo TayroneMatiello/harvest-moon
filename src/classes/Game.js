@@ -199,7 +199,7 @@ export default class Game extends Phaser.Scene {
       return 'chicken';
     }
 
-    if ( sprite.name.includes( 'bird' ) ) {
+    if ( sprite.name.includes( 'bird' ) || sprite.name.includes( 'dog' ) ) {
       return 'bird';
     }
 
@@ -222,6 +222,7 @@ export default class Game extends Phaser.Scene {
     if ( clickedAnimal !== expectedAnimal ) {
       this.memoryGameStarted = false;
       this.playerSequence = [];
+      this.restoreHiddenAnimals();
       this.showSimpleMessage( 'Você errou', false );
       this.time.delayedCall( 900, () => {
         this.showMemoryDialog();
@@ -243,11 +244,30 @@ export default class Game extends Phaser.Scene {
       sprite.overlap.setVisible( false );
     }
 
+    this.hiddenAnimals.push( sprite );
+
     if ( this.playerSequence.length === this.correctSequence.length ) {
       this.roundCompleted = true;
       this.showSimpleMessage( 'Parabéns, você conseguiu!', true );
     }
   }
+
+  restoreHiddenAnimals() {
+    this.hiddenAnimals.forEach( sprite => {
+      sprite.setVisible( true );
+      if ( sprite.body ) {
+        sprite.body.enable = true;
+      }
+      if ( sprite.overlap && sprite.overlap.body ) {
+        sprite.overlap.body.enable = true;
+        sprite.overlap.setVisible( true );
+      }
+      sprite.setInteractive( { useHandCursor: true } );
+    } );
+
+    this.hiddenAnimals = [];
+  }
+
 
   playSequence( index = 0 ) {
     if ( index === 0 ) {
@@ -278,7 +298,7 @@ export default class Game extends Phaser.Scene {
 
     const dialogBg = this.add.rectangle(
       this.scale.width / 2,
-      100,
+      this.scale.height / 2,
       dialogWidth,
       dialogHeight,
       0x000000,
@@ -289,7 +309,7 @@ export default class Game extends Phaser.Scene {
 
     const dialogText = this.add.text(
       this.scale.width / 2,
-      80,
+      this.scale.height / 2 - 20,
       'Ouça os sons e encontre os animais na ordem correta!',
       {
         font: '22px monospace',
@@ -302,13 +322,13 @@ export default class Game extends Phaser.Scene {
       .setScrollFactor( 0 )
       .setDepth( 1001 );
 
-    const startBtnBg = this.add.rectangle( this.scale.width / 2, 135, 140, 40, 0x1d6f42 )
+    const startBtnBg = this.add.rectangle( this.scale.width / 2, this.scale.height / 2 + 35, 140, 40, 0x1d6f42 )
       .setScrollFactor( 0 )
       .setDepth( 1001 )
       .setInteractive( { useHandCursor: true } )
       .setAlpha( 0.45 );
 
-    const startBtnText = this.add.text( this.scale.width / 2, 135, 'Iniciar', {
+    const startBtnText = this.add.text( this.scale.width / 2, this.scale.height / 2 + 35, 'Iniciar', {
       font: '20px monospace',
       fill: '#ffffff'
     } )
