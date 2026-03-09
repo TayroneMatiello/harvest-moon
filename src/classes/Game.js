@@ -127,6 +127,7 @@ export default class Game extends Phaser.Scene {
   }
   setupMemoryGame() {
     this.animals = ['cow', 'chicken', 'bird'];
+    this.availableAnimals = this.getAvailableAnimals();
     this.correctSequence = [];
     this.playerSequence = [];
     this.memoryGameStarted = false;
@@ -135,13 +136,32 @@ export default class Game extends Phaser.Scene {
     this.activeDialog = null;
 
     for ( let i = 0; i < 3; i++ ) {
-      const animal = Phaser.Utils.Array.GetRandom( this.animals );
+      const animal = Phaser.Utils.Array.GetRandom( this.availableAnimals );
       this.correctSequence.push( animal );
     }
 
     this.setupAnimalClickHandlers();
     this.showMemoryDialog();
     this.playSequence();
+  }
+
+  getAvailableAnimals() {
+    const foundAnimals = new Set();
+
+    Object.values( this._SPRITES ).forEach( sprite => {
+      if ( sprite.creatureType !== 'animal' ) {
+        return;
+      }
+
+      const animalType = this.getAnimalTypeFromSprite( sprite );
+      if ( animalType ) {
+        foundAnimals.add( animalType );
+      }
+    } );
+
+    const availableAnimals = this.animals.filter( animal => foundAnimals.has( animal ) );
+
+    return availableAnimals.length > 0 ? availableAnimals : ['cow', 'chicken'];
   }
 
   setupAnimalClickHandlers() {
@@ -183,17 +203,22 @@ export default class Game extends Phaser.Scene {
       return;
     }
 
-    this.playerSequence.push( clickedAnimal );
-
-    const currentIndex = this.playerSequence.length - 1;
+    const currentIndex = this.playerSequence.length;
     const expectedAnimal = this.correctSequence[currentIndex];
 
     if ( clickedAnimal !== expectedAnimal ) {
+      this.memoryGameStarted = false;
       this.playerSequence = [];
-      this.showMemoryStatus( 'Ops! Essa não é a ordem correta. Ouça novamente e tente outra vez.' );
-      this.playSequence();
+      this.showSimpleMessage( 'Você errou', false );
+      this.time.delayedCall( 900, () => {
+        this.showMemoryDialog();
+        this.playSequence();
+      } );
       return;
     }
+
+    this.playerSequence.push( clickedAnimal );
+    this.sound.play( clickedAnimal );
 
     sprite.disableInteractive();
     sprite.setVisible( false );
@@ -207,17 +232,15 @@ export default class Game extends Phaser.Scene {
 
     if ( this.playerSequence.length === this.correctSequence.length ) {
       this.roundCompleted = true;
-      this.showMemoryStatus( 'Parabéns! Você acertou a sequência dos animais!' );
-      return;
+      this.showSimpleMessage( 'Parabéns, você conseguiu!', true );
     }
-
-    this.showMemoryStatus( 'Muito bem! Agora encontre o próximo animal da sequência.' );
   }
 
   playSequence( index = 0 ) {
     if ( index === 0 ) {
       this.sequenceIsPlaying = true;
       this.memoryGameStarted = false;
+      this.playerSequence = [];
     }
 
     if ( index >= this.correctSequence.length ) {
@@ -229,12 +252,14 @@ export default class Game extends Phaser.Scene {
     const animal = this.correctSequence[index];
     this.sound.play( animal );
 
-    this.time.delayedCall( 1500, () => {
+    this.time.delayedCall( 1400, () => {
       this.playSequence( index + 1 );
     } );
   }
 
   showMemoryDialog() {
+    this.destroyMemoryDialog();
+
     const dialogWidth = 660;
     const dialogHeight = 170;
 
@@ -251,7 +276,7 @@ export default class Game extends Phaser.Scene {
 
     const dialogText = this.add.text(
       this.scale.width / 2,
-      70,
+      80,
       'Ouça os sons e encontre os animais na ordem correta!',
       {
         font: '22px monospace',
@@ -264,64 +289,79 @@ export default class Game extends Phaser.Scene {
       .setScrollFactor( 0 )
       .setDepth( 1001 );
 
-    const statusText = this.add.text(
-      this.scale.width / 2,
-      105,
-      'Memorize a sequência de sons.',
-      {
-        font: '18px monospace',
-        fill: '#ffd166',
-        align: 'center'
-      }
-    )
-      .setOrigin( 0.5 )
-      .setScrollFactor( 0 )
-      .setDepth( 1001 );
-
-    this.activeDialog = {
-      dialogBg,
-      dialogText,
-      statusText,
-      startBtnBg: null,
-      startBtnText: null
-    };
-  }
-
-  showStartButton() {
-    if ( this.roundCompleted || !this.activeDialog || this.activeDialog.startBtnBg ) {
-      return;
-    }
-
-    const startBtnBg = this.add.rectangle( this.scale.width / 2, 145, 140, 40, 0x1d6f42 )
+    const startBtnBg = this.add.rectangle( this.scale.width / 2, 135, 140, 40, 0x1d6f42 )
       .setScrollFactor( 0 )
       .setDepth( 1001 )
-      .setInteractive( { useHandCursor: true } );
+      .setInteractive( { useHandCursor: true } )
+      .setAlpha( 0.45 );
 
-    const startBtnText = this.add.text( this.scale.width / 2, 145, 'Iniciar', {
+    const startBtnText = this.add.text( this.scale.width / 2, 135, 'Iniciar', {
       font: '20px monospace',
       fill: '#ffffff'
     } )
       .setOrigin( 0.5 )
       .setScrollFactor( 0 )
-      .setDepth( 1002 );
+      .setDepth( 1002 )
+      .setAlpha( 0.45 );
 
-    startBtnBg.on( 'pointerdown', () => {
-      this.memoryGameStarted = true;
-      this.showMemoryStatus( 'Clique nos animais na ordem dos sons.' );
-      startBtnBg.destroy();
-      startBtnText.destroy();
-      this.activeDialog.startBtnBg = null;
-      this.activeDialog.startBtnText = null;
-    } );
-
-    this.activeDialog.startBtnBg = startBtnBg;
-    this.activeDialog.startBtnText = startBtnText;
-    this.showMemoryStatus( 'Agora clique em Iniciar para tentar.' );
+    this.activeDialog = {
+      dialogBg,
+      dialogText,
+      startBtnBg,
+      startBtnText
+    };
   }
 
-  showMemoryStatus( message ) {
-    if ( this.activeDialog && this.activeDialog.statusText ) {
-      this.activeDialog.statusText.setText( message );
+  showStartButton() {
+    if ( this.roundCompleted || !this.activeDialog || !this.activeDialog.startBtnBg ) {
+      return;
+    }
+
+    this.activeDialog.startBtnBg.setAlpha( 1 );
+    this.activeDialog.startBtnText.setAlpha( 1 );
+
+    this.activeDialog.startBtnBg.removeAllListeners( 'pointerdown' );
+    this.activeDialog.startBtnBg.on( 'pointerdown', () => {
+      this.memoryGameStarted = true;
+      this.destroyMemoryDialog();
+    } );
+  }
+
+  destroyMemoryDialog() {
+    if ( !this.activeDialog ) {
+      return;
+    }
+
+    Object.values( this.activeDialog ).forEach( elm => {
+      if ( elm && elm.destroy ) {
+        elm.destroy();
+      }
+    } );
+
+    this.activeDialog = null;
+  }
+
+  showSimpleMessage( message, isSuccess ) {
+    const width = 420;
+    const bg = this.add.rectangle( this.scale.width / 2, 80, width, 70, 0x000000, 0.9 )
+      .setScrollFactor( 0 )
+      .setDepth( 1100 );
+
+    const text = this.add.text( this.scale.width / 2, 80, message, {
+      font: '24px monospace',
+      fill: isSuccess ? '#7CFC00' : '#ff6666',
+      align: 'center',
+      wordWrap: { width: width - 30 }
+    } )
+      .setOrigin( 0.5 )
+      .setScrollFactor( 0 )
+      .setDepth( 1101 );
+
+    if ( !isSuccess ) {
+      this.time.delayedCall( 900, () => {
+        bg.destroy();
+        text.destroy();
+      } );
     }
   }
 
